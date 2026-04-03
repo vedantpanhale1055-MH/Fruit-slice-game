@@ -89,11 +89,19 @@
     #hand-status.detected{ color:var(--neon2); border-color:var(--neon2); }
 
     /* KATANA CONTAINER (previously finger-dot) */
-    .finger-dot{
-        position:absolute; width:1px; height:1px; /* The container is minimal */
-        pointer-events:none; z-index:100;
-        transform:translate(-50%,-50%); display:none;
-    }
+    .finger-dot {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 100;
+    transform: translate(-50%, -50%);
+    display: none;
+    box-shadow: 0 0 15px #fff, 0 0 30px #fff;
+}
+    
     
     /* THE KATANA */
     .finger-dot img {
