@@ -32,7 +32,7 @@ The app utilizes the `@mediapipe/hands` solution to identify 21 hand landmarks.
 ---
 
 ## 🎮 Local Setup
-1. Open `Cutfruit.html` via **Live Server**.
+1. Open `index.html` via **Live Server**.
 2. Enable your webcam and wait for **✅ Tracking Active**.
 3. **Clone the repository**:
    ```bash
