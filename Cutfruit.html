@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gesture Slice — The Katana</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+        --neon1:#FF3366; --neon2:#00F5D4; --neon3:#FFD23F; --neon4:#9B5DE5;
+    }
+    body{
+        background:#06060f; font-family:'Outfit',sans-serif; color:#fff;
+        overflow:hidden; height:100vh; width:100vw;
+        display:flex; flex-direction:column; align-items:center; justify-content:center;
+    }
+
+    /* SUBTLE BACKGROUND GRID */
+    .bg-grid{
+        position:fixed; inset:0; pointer-events:none; z-index:0;
+        background-image: linear-gradient(rgba(255,255,255,.015) 1px,transparent 1px),
+                          linear-gradient(90deg,rgba(255,255,255,.015) 1px,transparent 1px);
+        background-size:60px 60px;
+    }
+
+    /* SPLASH SCREEN (from image_1.png layout) */
+    #splash {
+        position:fixed; inset:0; z-index:100; background:#06060f;
+        display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2.5rem;
+        text-align:center; padding:2rem;
+    }
+    .splash-title-box { display: flex; flex-direction: column; align-items: center; }
+    .splash-title{ 
+        font-family:'Bebas Neue',sans-serif; font-size:clamp(4.5rem,15vw,10rem); 
+        line-height:.85; color:#fff;
+    }
+    .t2-slice {
+        background:linear-gradient(135deg,var(--neon1) 20%,var(--neon4) 80%);
+        -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    }
+
+    /* BADGES */
+    .splash-info-bar{ display:flex; gap:1.2rem; flex-wrap:wrap; justify-content:center; }
+    .info-badge{
+        padding:0.7rem 1.2rem; border-radius:12px;
+        background:#1a1a24; border: 1px solid rgba(255,255,255,0.05);
+        font-size:.85rem; display:flex; align-items:center; gap:.5rem;
+        font-weight:400; color:rgba(255,255,255,0.85);
+    }
+    .badge-icon { font-size: 1.1rem; }
+
+    /* START ENGINE BUTTON */
+    #start-btn{
+        padding:1.1rem 3.5rem; border-radius:999px; border:none; color:#fff;
+        background:linear-gradient(135deg,var(--neon1),var(--neon4));
+        font-family:'Bebas Neue',sans-serif; font-size:1.6rem; cursor:pointer;
+        box-shadow: 0 0 25px rgba(255,51,102,0.4), 0 0 40px rgba(155,93,229,0.3);
+    }
+
+    /* LOADING SCREEN */
+    #loading {
+        position:fixed; inset:0; z-index:110; background:#06060f;
+        display:none; flex-direction:column; align-items:center; justify-content:center; gap:1.5rem;
+    }
+    .load-title { font-family:'Bebas Neue',sans-serif; font-size:1.5rem; letter-spacing:2px; color:rgba(255,255,255,0.7); }
+    .load-bar-wrap{ width:250px; height:4px; background:rgba(255,255,255,0.1); border-radius:10px; overflow:hidden; }
+    .load-bar{ height:100%; width:0%; background:var(--neon2); transition:0.3s; }
+
+    /* GAME UI */
+    #game-wrap{ position:fixed; inset:0; z-index:10; display:none; }
+    #video{ position:absolute; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); opacity:0; pointer-events:none; }
+    #game-canvas{ position:absolute; inset:0; width:100%; height:100%; cursor: none; }
+
+    .hud{
+        position:absolute; top:20px; left:30px; right:30px;
+        display:flex; justify-content:space-between; pointer-events:none; z-index:20;
+    }
+    .score-box{ font-family:'Bebas Neue',sans-serif; font-size:3rem; }
+    #combo-hud{ font-family:'Bebas Neue',sans-serif; font-size:2rem; color:var(--neon3); opacity:0; transition:0.2s; }
+    #combo-hud.show{ opacity:1; }
+
+    /* HAND STATUS INDICATOR */
+    #hand-status{
+        position:absolute; bottom:20px; left:50%; transform:translateX(-50%);
+        padding:8px 20px; border-radius:20px; background:rgba(0,0,0,0.6);
+        border:1px solid rgba(255,255,255,0.1); font-size:0.8rem; color:rgba(255,255,255,0.5); z-index:30;
+    }
+    #hand-status.detected{ color:var(--neon2); border-color:var(--neon2); }
+
+    /* KATANA CONTAINER (previously finger-dot) */
+    .finger-dot{
+        position:absolute; width:1px; height:1px; /* The container is minimal */
+        pointer-events:none; z-index:100;
+        transform:translate(-50%,-50%); display:none;
+    }
+    
+    /* THE KATANA */
+    .finger-dot img {
+        height: 60px; /* Adjust size of katana */
+        width: auto;
+        /* Initial rotation: -135deg aligns it properly with finger point */
+        transform: translate(0px, 0px) rotate(-135deg); 
+        transform-origin: 0% 50%; /* Origin at the hilt, aligns with point */
+        /* ADDED SMALL GLOW HERE */
+        filter: drop-shadow(0 0 8px rgba(255,255,255,0.7)); 
+    }
+
+    @keyframes shake{
+        0%,100%{transform:translate(0,0)}
+        25%{transform:translate(-8px,0)}
+        75%{transform:translate(8px,0)}
+    }
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+
+<div id="splash">
+    <div class="splash-title-box">
+        <span class="splash-title">GESTURE</span>
+        <span class="splash-title t2-slice">SLICE</span>
+    </div>
+    
+    <div class="splash-info-bar">
+        <div class="info-badge">
+            <span class="badge-icon">📹</span> <b>Webcam</b> Active
+        </div>
+        <div class="info-badge">
+            <span class="badge-icon">☝️</span> <b>Index Tip</b> is Katana
+        </div>
+        <div class="info-badge">
+            <span class="badge-icon">💣</span> <b>Avoid</b> Bombs
+        </div>
+    </div>
+    
+    <button id="start-btn">START ENGINE</button>
+</div>
+
+<div id="loading">
+    <div class="load-title">INITIALIZING KATANA BLADE</div>
+    <div class="load-bar-wrap"><div class="load-bar" id="load-bar"></div></div>
+</div>
+
+<div id="game-wrap">
+    <video id="video" playsinline autoplay muted></video>
+    <canvas id="game-canvas"></canvas>
+    
+    <div class="hud">
+        <div class="score-box"><div id="score-val">0</div></div>
+        <div id="combo-hud">COMBO X<span id="combo-num">0</span></div>
+    </div>
+
+    <div id="hand-status">✋ Finding Katana...</div>
+
+    <div class="finger-dot" id="finger-dot">
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+<script>
+const FRUIT_EMOJIS = ['🍉','🍊','🍋','🍇','🍓','🥝','🍎','🍍','🍑'];
+const BOMB_EMOJI = '💣';
+const COLORS = ['#FF3366', '#00F5D4', '#FFD23F', '#9B5DE5', '#FF8C42'];
+
+let canvas = document.getElementById('game-canvas');
+let ctx = canvas.getContext('2d');
+let score = 0, combo = 0, comboTimer = null;
+let fruits = [], particles = [], slashTrail = [];
+let gameRunning = false;
+let fingerX = -1, fingerY = -1, prevFingerX = -1, prevFingerY = -1;
+
+class Fruit {
+    constructor() {
+        this.isBomb = Math.random() < 0.18;
+        this.emoji = this.isBomb ? BOMB_EMOJI : FRUIT_EMOJIS[Math.floor(Math.random()*FRUIT_EMOJIS.length)];
+        this.size = 55 + Math.random()*25;
+        this.x = this.size + Math.random() * (canvas.width - this.size*2);
+        this.y = canvas.height + this.size;
+        const gravity = 0.22;
+        const jumpHeight = canvas.height * (0.75 + Math.random()*0.2);
+        this.vy = -Math.sqrt(2 * gravity * jumpHeight);
+        this.vx = (canvas.width/2 - this.x) * 0.012 + (Math.random()-0.5)*4;
+        this.gravity = gravity;
+        this.rotation = Math.random() * Math.PI * 2;
+        this.rotSpeed = (Math.random()-0.5)*0.08;
+        this.sliced = false;
+        this.alpha = 1;
+        this.color = COLORS[Math.floor(Math.random()*COLORS.length)];
+    }
+
+    update() {
+        this.vy += this.gravity;
+        this.x += this.vx;
+        this.y += this.vy;
+        this.rotation += this.rotSpeed;
+        if(this.sliced) this.alpha -= 0.12;
+    }
+
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.alpha);
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+        ctx.shadowBlur = 0; // Keeping no fruit glow as per previous instruction
+        ctx.font = `${this.size}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.emoji, 0, 0);
+        ctx.restore();
+    }
+
+    checkSlash(x1, y1, x2, y2) {
+        if(this.sliced) return false;
+        const d = this.distToSegment(this.x, this.y, x1, y1, x2, y2);
+        return d < this.size * 0.55;
+    }
+
+    distToSegment(px, py, x1, y1, x2, y2) {
+        const l2 = (x1-x2)**2 + (y1-y2)**2;
+        if(l2 === 0) return Math.sqrt((px-x1)**2 + (py-y1)**2);
+        let t = ((px-x1)*(x2-x1) + (py-y1)*(y2-y1)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.sqrt((px - (x1+t*(x2-x1)))**2 + (py - (y1+t*(y2-y1)))**2);
+    }
+}
+
+class Particle {
+    constructor(x, y, color) {
+        this.x = x; this.y = y;
+        this.vx = (Math.random()-0.5)*18;
+        this.vy = (Math.random()-0.5)*18;
+        this.alpha = 1;
+        this.color = color;
+        this.size = Math.random()*4 + 1;
+    }
+    update() { this.x+=this.vx; this.y+=this.vy; this.alpha -= 0.04; }
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        ctx.fillStyle = this.color;
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+    }
+}
+
+function spawn() {
+    if(!gameRunning) return;
+    fruits.push(new Fruit());
+    setTimeout(spawn, 800 + Math.random()*1200);
+}
+
+function doSlash(x1, y1, x2, y2) {
+    fruits.forEach(f => {
+        if(f.checkSlash(x1, y1, x2, y2)) {
+            f.sliced = true;
+            if(f.isBomb) {
+                score = Math.max(0, score - 100);
+                document.getElementById('game-wrap').style.animation = 'shake 0.2s';
+                setTimeout(() => document.getElementById('game-wrap').style.animation = '', 200);
+            } else {
+                score += 10;
+                combo++;
+                if(comboTimer) clearTimeout(comboTimer);
+                comboTimer = setTimeout(() => { combo = 0; document.getElementById('combo-hud').classList.remove('show'); }, 800);
+                if(combo > 1) {
+                    document.getElementById('combo-num').textContent = combo;
+                    document.getElementById('combo-hud').classList.add('show');
+                }
+            }
+            document.getElementById('score-val').textContent = score;
+            for(let i=0; i<12; i++) particles.push(new Particle(f.x, f.y, f.color));
+        }
+    });
+}
+
+function gameLoop() {
+    if(!gameRunning) return;
+    ctx.fillStyle = '#06060f'; // Dark background
+    ctx.fillRect(0,0,canvas.width, canvas.height);
+
+    if(slashTrail.length > 1) {
+        ctx.beginPath();
+        // Making the trail white to match image_2.png aesthetic
+        ctx.strokeStyle = '#fff'; 
+        ctx.lineWidth = 3; ctx.lineCap = 'round';
+        ctx.moveTo(slashTrail[0].x, slashTrail[0].y);
+        for(let p of slashTrail) ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+    }
+
+    fruits = fruits.filter(f => { f.update(); f.draw(); return f.y < canvas.height + 100 && f.alpha > 0; });
+    particles = particles.filter(p => { p.update(); p.draw(); return p.alpha > 0; });
+
+    requestAnimationFrame(gameLoop);
+}
+
+const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.5 });
+
+hands.onResults(results => {
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const tip = results.multiHandLandmarks[0][8];
+        const nx = (1 - tip.x) * canvas.width;
+        const ny = tip.y * canvas.height;
+        prevFingerX = fingerX; prevFingerY = fingerY;
+        fingerX = nx; fingerY = ny;
+
+        const container = document.getElementById('finger-dot');
+        container.style.display = 'block';
+        container.style.left = nx + 'px'; container.style.top = ny + 'px';
+        document.getElementById('hand-status').classList.add('detected');
+        document.getElementById('hand-status').textContent = '⚔️ KATANA ACTIVE';
+
+        slashTrail.push({x: nx, y: ny});
+        if(slashTrail.length > 5) slashTrail.shift(); // Slightly shorter trail
+        if(prevFingerX > 0) doSlash(prevFingerX, prevFingerY, fingerX, fingerY);
+    } else {
+        document.getElementById('finger-dot').style.display = 'none';
+        document.getElementById('hand-status').classList.remove('detected');
+        document.getElementById('hand-status').textContent = '✋ Locating hand...';
+        slashTrail = []; fingerX = -1;
+    }
+});
+
+async function start() {
+    document.getElementById('splash').style.display = 'none';
+    document.getElementById('loading').style.display = 'flex';
+    
+    try {
+        const videoElement = document.getElementById('video');
+        const camera = new Camera(videoElement, {
+            onFrame: async () => { await hands.send({image: videoElement}); },
+            width: 1280, height: 720
+        });
+        
+        await camera.start();
+        document.getElementById('load-bar').style.width = '100%';
+        setTimeout(() => {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('game-wrap').style.display = 'block';
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            gameRunning = true;
+            spawn();
+            gameLoop();
+        }, 800);
+    } catch (e) { alert("Camera Error: " + e); location.reload(); }
+}
+
+document.getElementById('start-btn').onclick = start;
+window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+window.onkeydown = (e) => { if(e.key === 'Escape') location.reload(); };
+
+</script>
+</body>
+</html>
